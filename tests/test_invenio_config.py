@@ -2,6 +2,7 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2015-2018 CERN.
+# Copyright (C) 2024 KTH Royal Institute of Technology.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -16,6 +17,7 @@ import tempfile
 import warnings
 from os.path import join
 
+import pytest
 from flask import Flask
 from mock import patch
 from pkg_resources import EntryPoint
@@ -29,6 +31,7 @@ from invenio_config import (
     create_config_loader,
 )
 from invenio_config.default import ALLOWED_HTML_ATTRS, ALLOWED_HTML_TAGS
+from invenio_config.utils import build_broker_url, build_db_uri, build_redis_url
 
 
 class ConfigEP(EntryPoint):
@@ -231,3 +234,205 @@ def test_conf_loader_factory():
         assert app.config["ENV"] == "env"
     finally:
         shutil.rmtree(tmppath)
+
+
+@pytest.mark.parametrize(
+    "env_vars, expected_uri",
+    [
+        (
+            {
+                "INVENIO_DB_USER": "testuser",
+                "INVENIO_DB_PASSWORD": "testpassword",
+                "INVENIO_DB_HOST": "testhost",
+                "INVENIO_DB_PORT": "5432",
+                "INVENIO_DB_NAME": "testdb",
+                "INVENIO_DB_PROTOCOL": "postgresql+psycopg2",
+            },
+            "postgresql+psycopg2://testuser:testpassword@testhost:5432/testdb",
+        ),
+        (
+            {"INVENIO_SQLALCHEMY_DATABASE_URI": "sqlite:///test.db"},
+            "sqlite:///test.db",
+        ),
+        (
+            {"SQLALCHEMY_DATABASE_URI": "sqlite:///test.db"},
+            "sqlite:///test.db",
+        ),
+        (
+            {},
+            "postgresql+psycopg2://invenio-app-rdm:invenio-app-rdm@localhost/invenio-app-rdm",
+        ),
+    ],
+)
+def test_build_db_uri(monkeypatch, env_vars, expected_uri):
+    """Test building database URI."""
+    for key in [
+        "INVENIO_DB_USER",
+        "INVENIO_DB_PASSWORD",
+        "INVENIO_DB_HOST",
+        "INVENIO_DB_PORT",
+        "INVENIO_DB_NAME",
+        "INVENIO_DB_PROTOCOL",
+        "INVENIO_SQLALCHEMY_DATABASE_URI",
+        "SQLALCHEMY_DATABASE_URI",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env_vars.items():
+        monkeypatch.setenv(key, value)
+
+    assert build_db_uri() == expected_uri
+
+
+@pytest.mark.parametrize(
+    "env_vars, expected_url",
+    [
+        (
+            {
+                "INVENIO_BROKER_USER": "testuser",
+                "INVENIO_BROKER_PASSWORD": "testpassword",
+                "INVENIO_BROKER_HOST": "testhost",
+                "INVENIO_BROKER_PORT": "5672",
+                "INVENIO_BROKER_PROTOCOL": "amqp",
+            },
+            "amqp://testuser:testpassword@testhost:5672/",
+        ),
+        (
+            {"INVENIO_BROKER_URL": "amqp://guest:guest@localhost:5672/"},
+            "amqp://guest:guest@localhost:5672/",
+        ),
+        (
+            {"BROKER_URL": "amqp://guest:guest@localhost:5672/"},
+            "amqp://guest:guest@localhost:5672/",
+        ),
+        (
+            {},
+            "amqp://guest:guest@localhost:5672/",
+        ),
+    ],
+)
+def test_build_broker_url(monkeypatch, env_vars, expected_url):
+    """Test building broker URL."""
+    for key in [
+        "INVENIO_BROKER_USER",
+        "INVENIO_BROKER_PASSWORD",
+        "INVENIO_BROKER_HOST",
+        "INVENIO_BROKER_PORT",
+        "INVENIO_BROKER_PROTOCOL",
+        "INVENIO_BROKER_URL",
+        "BROKER_URL",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env_vars.items():
+        monkeypatch.setenv(key, value)
+
+    assert build_broker_url() == expected_url
+
+
+@pytest.mark.parametrize(
+    "env_vars, expected_url",
+    [
+        (
+            {
+                "INVENIO_BROKER_USER": "testuser",
+                "INVENIO_BROKER_PASSWORD": "testpassword",
+                "INVENIO_BROKER_HOST": "testhost",
+                "INVENIO_BROKER_PORT": "5672",
+                "INVENIO_BROKER_PROTOCOL": "amqp",
+                "INVENIO_BROKER_VHOST": "/testvhost",
+            },
+            "amqp://testuser:testpassword@testhost:5672/testvhost",
+        ),
+        (
+            {
+                "INVENIO_BROKER_USER": "testuser",
+                "INVENIO_BROKER_PASSWORD": "testpassword",
+                "INVENIO_BROKER_HOST": "testhost",
+                "INVENIO_BROKER_PORT": "5672",
+                "INVENIO_BROKER_PROTOCOL": "amqp",
+                "INVENIO_BROKER_VHOST": "testvhost",
+            },
+            "amqp://testuser:testpassword@testhost:5672/testvhost",
+        ),
+        (
+            {"INVENIO_BROKER_URL": "amqp://guest:guest@localhost:5672/"},
+            "amqp://guest:guest@localhost:5672/",
+        ),
+        (
+            {},
+            "amqp://guest:guest@localhost:5672/",
+        ),
+    ],
+)
+def test_build_broker_url_with_vhost(monkeypatch, env_vars, expected_url):
+    """Test building broker URL with vhost."""
+    for key in [
+        "INVENIO_BROKER_USER",
+        "INVENIO_BROKER_PASSWORD",
+        "INVENIO_BROKER_HOST",
+        "INVENIO_BROKER_PORT",
+        "INVENIO_BROKER_PROTOCOL",
+        "INVENIO_BROKER_URL",
+        "INVENIO_BROKER_VHOST",
+        "BROKER_URL",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env_vars.items():
+        monkeypatch.setenv(key, value)
+
+    assert build_broker_url() == expected_url
+
+
+@pytest.mark.parametrize(
+    "env_vars, db, expected_url",
+    [
+        (
+            {
+                "INVENIO_REDIS_HOST": "testhost",
+                "INVENIO_REDIS_PORT": "6379",
+                "INVENIO_REDIS_PASSWORD": "testpassword",
+                "INVENIO_REDIS_PROTOCOL": "redis",
+            },
+            2,
+            "redis://:testpassword@testhost:6379/2",
+        ),
+        (
+            {
+                "INVENIO_REDIS_HOST": "testhost",
+                "INVENIO_REDIS_PORT": "6379",
+                "INVENIO_REDIS_PROTOCOL": "redis",
+            },
+            1,
+            "redis://testhost:6379/1",
+        ),
+        (
+            {"BROKER_URL": "redis://localhost:6379/0"},
+            None,
+            "redis://localhost:6379/0",
+        ),
+        (
+            {"INVENIO_REDIS_URL": "redis://localhost:6379/3"},
+            3,
+            "redis://localhost:6379/3",
+        ),
+        (
+            {},
+            4,
+            "redis://localhost:6379/4",
+        ),
+    ],
+)
+def test_build_redis_url(monkeypatch, env_vars, db, expected_url):
+    """Test building Redis URL."""
+    for key in [
+        "INVENIO_REDIS_HOST",
+        "INVENIO_REDIS_PORT",
+        "INVENIO_REDIS_PASSWORD",
+        "INVENIO_REDIS_PROTOCOL",
+        "INVENIO_REDIS_URL",
+        "BROKER_URL",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env_vars.items():
+        monkeypatch.setenv(key, value)
+
+    assert build_redis_url(db=db) == expected_url
