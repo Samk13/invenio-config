@@ -31,7 +31,7 @@ from invenio_config import (
     create_config_loader,
 )
 from invenio_config.default import ALLOWED_HTML_ATTRS, ALLOWED_HTML_TAGS
-from invenio_config.utils import build_broker_url, build_db_uri, build_redis_url
+from invenio_config.env import InvenioConfigURLBuilder
 
 
 class ConfigEP(EntryPoint):
@@ -279,7 +279,8 @@ def set_env_vars(monkeypatch, env_vars):
 def test_build_db_uri(monkeypatch, env_vars, expected_uri):
     """Test building database URI."""
     set_env_vars(monkeypatch, env_vars)
-    assert build_db_uri() == expected_uri
+    builder = InvenioConfigURLBuilder()
+    assert builder.db_uri == expected_uri
 
 
 @pytest.mark.parametrize(
@@ -330,51 +331,11 @@ def test_build_db_uri(monkeypatch, env_vars, expected_uri):
         ),
     ],
 )
-def test_build_broker_url_with_vhost(monkeypatch, env_vars, expected_url):
-    """Test building broker URL with vhost."""
+def test_build_broker_url(monkeypatch, env_vars, expected_url):
+    """Test building broker URL."""
     set_env_vars(monkeypatch, env_vars)
-    assert build_broker_url() == expected_url
-
-
-@pytest.mark.parametrize(
-    "env_vars, expected_url",
-    [
-        (
-            {
-                "INVENIO_BROKER_USER": "testuser",
-                "INVENIO_BROKER_PASSWORD": "testpassword",
-                "INVENIO_BROKER_HOST": "testhost",
-                "INVENIO_BROKER_PORT": "5672",
-                "INVENIO_BROKER_PROTOCOL": "amqp",
-                "INVENIO_BROKER_VHOST": "/testvhost",
-            },
-            "amqp://testuser:testpassword@testhost:5672/testvhost",
-        ),
-        (
-            {
-                "INVENIO_BROKER_USER": "testuser",
-                "INVENIO_BROKER_PASSWORD": "testpassword",
-                "INVENIO_BROKER_HOST": "testhost",
-                "INVENIO_BROKER_PORT": "5672",
-                "INVENIO_BROKER_PROTOCOL": "amqp",
-                "INVENIO_BROKER_VHOST": "testvhost",
-            },
-            "amqp://testuser:testpassword@testhost:5672/testvhost",
-        ),
-        (
-            {"INVENIO_BROKER_URL": "amqp://guest:guest@localhost:5672/"},
-            "amqp://guest:guest@localhost:5672/",
-        ),
-        (
-            {},
-            "amqp://guest:guest@localhost:5672/",
-        ),
-    ],
-)
-def test_build_broker_url_with_vhost(monkeypatch, env_vars, expected_url):
-    """Test building broker URL with vhost."""
-    set_env_vars(monkeypatch, env_vars)
-    assert build_broker_url() == expected_url
+    builder = InvenioConfigURLBuilder()
+    assert builder.broker_url == expected_url
 
 
 @pytest.mark.parametrize(
@@ -419,4 +380,5 @@ def test_build_broker_url_with_vhost(monkeypatch, env_vars, expected_url):
 def test_build_redis_url(monkeypatch, env_vars, db, expected_url):
     """Test building Redis URL."""
     set_env_vars(monkeypatch, env_vars)
-    assert build_redis_url(db=db) == expected_url
+    builder = InvenioConfigURLBuilder()
+    assert builder.get_redis_url(db=db) == expected_url
